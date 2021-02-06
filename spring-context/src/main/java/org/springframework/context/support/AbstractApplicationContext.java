@@ -155,6 +155,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	static {
 		// Eagerly load the ContextClosedEvent class to avoid weird classloader issues
 		// on application shutdown in WebLogic 8.1. (Reported by Dustin Woods.)
+		//急于加载ContextClosedEvent类，以避免在WebLogic 8.1中的应用程序关闭时出现奇怪的类加载器问题
 		ContextClosedEvent.class.getName();
 	}
 
@@ -514,41 +515,62 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 
 	@Override
 	public void refresh() throws BeansException, IllegalStateException {
+		// 对象锁 refresh registerShutdownHook close
 		synchronized (this.startupShutdownMonitor) {
 			// Prepare this context for refreshing.
+			// 第⼀步：刷新前的预处理
 			prepareRefresh();
 
 			// Tell the subclass to refresh the internal bean factory.
+			// 第⼆步：获取BeanFactory；默认实现是DefaultListableBeanFactory
+			//       加载BeanDefition 并注册到 BeanDefitionRegistry
 			ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();
 
 			// Prepare the bean factory for use in this context.
+			//第三步：BeanFactory的预准备⼯作（BeanFactory进⾏⼀些设置，⽐如context的类加载器等）
 			prepareBeanFactory(beanFactory);
 
 			try {
 				// Allows post-processing of the bean factory in context subclasses.
+				// 第四步：BeanFactory准备⼯作完成后进⾏的后置处理⼯作
 				postProcessBeanFactory(beanFactory);
 
 				// Invoke factory processors registered as beans in the context.
+				// 第五步：实例化并调⽤实现了BeanFactoryPostProcessor接⼝的Bean
 				invokeBeanFactoryPostProcessors(beanFactory);
 
 				// Register bean processors that intercept bean creation.
+				// 第六步：注册BeanPostProcessor（Bean的后置处理器），在创建bean的前后等执行
 				registerBeanPostProcessors(beanFactory);
 
 				// Initialize message source for this context.
+				// 第七步：初始化MessageSource组件（做国际化功能；消息绑定，消息解析）；
 				initMessageSource();
 
 				// Initialize event multicaster for this context.
+				// 第⼋步：初始化事件派发器
 				initApplicationEventMulticaster();
 
 				// Initialize other special beans in specific context subclasses.
+				// 第九步：⼦类重写这个⽅法，在容器刷新的时候可以⾃定义逻辑
 				onRefresh();
 
 				// Check for listener beans and register them.
+				//// 第⼗步：注册应⽤的监听器。就是注册实现了ApplicationListener接⼝的监听器bean
 				registerListeners();
 
+				/*
+				  第⼗⼀步：
+				  初始化所有剩下的⾮懒加载的单例bean
+				  初始化创建⾮懒加载⽅式的单例Bean实例（未设置属性）
+				  填充属性
+				  初始化⽅法调⽤（⽐如调⽤afterPropertiesSet⽅法、init-method⽅法）
+				  调⽤BeanPostProcessor（后置处理器）对实例bean进⾏后置处
+				*/
 				// Instantiate all remaining (non-lazy-init) singletons.
 				finishBeanFactoryInitialization(beanFactory);
 
+				// 完成context的刷新 主要是调⽤LifecycleProcessor的onRefresh()⽅法，并且发布事件（ContextRefreshedEvent）
 				// Last step: publish corresponding event.
 				finishRefresh();
 			}
